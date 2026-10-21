@@ -141,3 +141,10 @@ Each core component is implemented and tested independently to build an understa
 🚧 Under active development
 
 This repository serves as the theoretical and implementation foundation for later multimodal and VLM projects.
+
+## Implementation provenance
+
+The initial Attention and Transformer Block implementations were
+migrated from `hqiqi-core/pytorch-from-scratch` at commit `25bcedb`.
+
+Their maintained versions now live in this repository.
