@@ -141,9 +141,10 @@ class MultiHeadAttention(nn.Module):
 
 
         scores = Q_h @ K_h.transpose(-2,-1)
+        # 除以 sqrt(head_dim)，是为了抑制点积随维度增大而变大的趋势，避免softmax过于尖锐、梯度变差
         scores = scores / math.sqrt(self.head_dim)  # 应该是 self.head_dim 因为分头了 现在的特征维度是head_dim 
 
-        attention = torch.softmax(scores,dim=-1)
+        attention = torch.softmax(scores,dim=-1)  # Attention的softmax沿Key/token维度，不是特征维度。
 
         out = attention @ V_h
 
