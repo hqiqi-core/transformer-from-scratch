@@ -62,8 +62,38 @@ def test_backward():
     print("Loss:", loss.item())
     print("Backward check passed.")
 
+def test_padding_does_not_change_valid_outputs():
+    torch.manual_seed(0)
+    model = TinyTransformerEncoder(
+        vocab_size=32,
+        max_length=12,
+        d_model=32,
+        num_heads=4,
+        ffn_dim=64,
+        num_layers=2,
+    )
+    model.eval()
+
+    original = torch.tensor([[1, 7, 9, 4]])
+    padded   = torch.tensor([[1, 7, 9, 4, 0, 0, 0]])
+
+    with torch.no_grad():
+        original_output = model(original)
+        padded_output   = model(padded)
+
+    assert original_output.shape == (1, 4, 32)
+    assert padded_output.shape == (1, 7, 32)
+    assert torch.allclose(
+        original_output,
+        padded_output[:, :4, :],
+        atol=1e-5,
+        rtol=1e-5,
+    ), "padding PADs changed valid token outputs"
+    print("Padding invariance: OK")     
+
 
 if __name__ == "__main__":
     test_forward_shapes_and_independent_layers()
     test_backward()
+    test_padding_does_not_change_valid_outputs()
     print("All Mini Transformer tests passed.")

@@ -52,9 +52,9 @@ class TransformerBlock(nn.Module):
         # TODO: 定义第二个 LayerNorm
         self.layerNorm2 = nn.LayerNorm(self.embed_dim)
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
         # TODO 1: Attention
-        attention = self.MultiHeadAttention(x)
+        attention = self.MultiHeadAttention(x,attention_mask=attention_mask)
         # TODO 2: 残差连接 + LayerNorm
         x = self.layerNorm1(x + attention)
         # TODO 3: FeedForward

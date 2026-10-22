@@ -4,6 +4,21 @@ import torch.nn as nn
 from transformer_block import TransformerBlock
 
 
+"""
+同一个 batch 里的序列长度不一样  变长序列 → 右侧补PAD → 用Mask屏蔽PAD → Transformer → 分类头 → backward → 验证
+Mask	              位置	                解决什么问题
+Attention Mask	MHA 的 softmax 前	防止真实 token 去"关注"PAD 位置
+Pooling Mask	最后取平均时	     防止 PAD 位置的输出参与最终表示
+
+为什么 PAD 会干扰 Attention？
+两条序列补成 batch：
+[1,7,9,4]      → [1,7,9,4,0,0]
+[8,6,2,5,9,1]  → [8,6,2,5,9,1]
+如果没有 mask，第一条序列里 1,7,9,4 每个 token 做 attention 时，会在 6 个位置（4真实 + 2PAD）上分配 softmax 权重。PAD 也会分到权重。PAD 位置会实实在在地分走一部分概率质量，稀释真实 token 的权重
+所以必须在 softmax 之前，把 PAD 对应的 Key 分数设成 -inf，这样 softmax 后它们的权重就是 0
+
+
+"""
 class TinyTransformerEncoder(nn.Module):
     def __init__(
         self,
@@ -27,7 +42,7 @@ class TinyTransformerEncoder(nn.Module):
         序列 B: [9, 2, 7, 3]  → token 7 的向量还是 W[7]
         经过学习，W 这张 [vocab_size, 32] 的矩阵被更新；每个 ID 对应的 32 维向量就是 W 的第 id 行
         """
-        self.token_embedding = nn.Embedding(vocab_size, d_model)  # 内部只有一个权重矩阵 W: [vocab_size, d_model] = [32, 32] 
+        self.token_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)  # 内部只有一个权重矩阵 W: [vocab_size, d_model] = [32, 32] 
         """
         Position Embedding —— 告诉模型顺序   Self-Attention 做的是加权求和，没有天然的"第几个位置"概念
         只做 token 查表时，[3,7,2,9] 和 [9,2,7,3] 里相同 token 拿到相同向量，Attention 看到的是同一个多重集，无法区分顺序。所以必须显式注入位置。
@@ -50,7 +65,20 @@ class TinyTransformerEncoder(nn.Module):
         ])
         
 
-    def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
+    def forward(self, input_ids: torch.Tensor,attention_mask=None) -> torch.Tensor:
+        if attention_mask is None:
+            attention_mask = input_ids.ne(0)          # [B,L] bool  input_ids.ne(0)：逐 token 判断"非 PAD"，得到 [B,L] bool。这是 mask 的默认来源  ne = not equal
+
+        attention_mask = attention_mask.bool()         # 兜底：防止调用方传 long  如果调用方传了 long（0/1），转成 bool，否则后面 ~key_mask 按位取反会出错（~0=-1, ~1=-2）
+        if attention_mask.shape != input_ids.shape:   # 形状校验：mask 必须和 input_ids 同形
+            raise ValueError(
+                f"attention_mask shape {attention_mask.shape} "
+                f"!= input_ids shape {input_ids.shape}"
+            )
+
+        if not attention_mask.any(dim=1).all():  # [B]，每条序列"是否至少一个 True"；.all() 检查所有序列都满足。
+            raise ValueError("each sequence must contain a valid token")
+
         assert input_ids.dim() == 2, "input_ids must be [B, L]"    
         assert input_ids.dtype == torch.long, "input_ids must be int64"   
 
@@ -68,6 +96,6 @@ class TinyTransformerEncoder(nn.Module):
         x = token_vectors + position_vectors.unsqueeze(0)        # [B,L,D]   position_vectors.unsqueeze(0)：[L,D] → [1,L,D]，再与 [B,L,D] 广播相加
 
         for block in self.blocks:
-            x = block(x)
+            x = block(x, attention_mask=attention_mask)
 
         return x
