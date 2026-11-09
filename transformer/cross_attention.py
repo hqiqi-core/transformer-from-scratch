@@ -23,6 +23,7 @@ class CrossAttention(nn.Module):
         self,
         query: torch.Tensor,
         context: torch.Tensor,
+        context_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # 1. 分别取 query 和 context 的序列长度
         batch_size, query_length, _ = query.shape  # （Lq）：query 序列多长
@@ -56,6 +57,25 @@ class CrossAttention(nn.Module):
         scores[b,h,i,j] = "第 i 个 query token 对第 j 个 context token 的相似度"
         """
         scores = scores / math.sqrt(self.head_dim)
+        # 有 mask 时：检查 + 在 softmax 前屏蔽 padding 的 key 列
+        if context_mask is not None:
+            if context_mask.dtype != torch.bool:
+                raise ValueError(
+                    f"context_mask must be bool, got {context_mask.dtype}"
+                )
+            if context_mask.shape != (batch_size, context_length):
+                raise ValueError(
+                    f"context_mask shape {tuple(context_mask.shape)} "
+                    f"!= (batch_size, context_length) "
+                    f"= ({batch_size}, {context_length})"
+                )
+            if not context_mask.any(dim=-1).all():
+                raise ValueError(
+                    "each sample must have at least one valid context position"
+                )
+            valid_keys = context_mask[:, None, None, :]   # [B,1,1,Lc]
+            scores = scores.masked_fill(~valid_keys, float("-inf"))
+
         attention_weights = torch.softmax(scores, dim=-1)   # [B, H, Lq, Lc]  softmax 沿最后一维（Lc）：每个 query token 在所有 context token 上分配权重。
 
         # 5. 加权读取 V
