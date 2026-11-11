@@ -34,7 +34,7 @@ def make_split(num_samples: int, seed: int):
         patch_idx = CLASS_TO_PATCH[label]
         row, col = divmod(patch_idx, GW)
         r0, c0 = row * PATCH_SIZE, col * PATCH_SIZE
-        images[i, :, r0:r0 + PATCH_SIZE, c0:c0 + PATCH_SIZE] = 1.0   
+        images[i, :, r0:r0 + PATCH_SIZE, c0:c0 + PATCH_SIZE] = 1.0
 
     perm = torch.randperm(num_samples, generator=g)
     return images[perm], labels[perm]
