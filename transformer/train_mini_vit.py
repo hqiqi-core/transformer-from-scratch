@@ -104,6 +104,9 @@ def main():
     )
     optimizer = torch.optim.Adam(model.parameters(), lr=3e-3)
 
+    initial_val_acc = evaluate(model, val_loader)
+    print(f"epoch 00: val_acc={initial_val_acc:.4f}")
+
     for epoch in range(1, args.epochs + 1):
         train_loss = train_one_epoch(model, train_loader, optimizer)
         val_acc = evaluate(model, val_loader)
