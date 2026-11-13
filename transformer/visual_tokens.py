@@ -18,19 +18,19 @@ def main():
     print("original image size:", image.size)   # (W, H)
 
     processor = CLIPImageProcessor.from_pretrained(MODEL_NAME)  # CLIPImageProcessor：只做图像预处理（resize、裁剪、归一化），不加载文本塔
-    model = CLIPVisionModel.from_pretrained(MODEL_NAME).eval()  # 只加载视觉编码器，不要 CLIPModel（那是完整的图文模型，有文本塔）。今天只关心视觉 token 
+    model = CLIPVisionModel.from_pretrained(MODEL_NAME).eval()  # 只加载视觉编码器，不要 CLIPModel（那是完整的图文模型，有文本塔）。今天只关心视觉 token
 
-    pixel_values = processor(images=image, return_tensors="pt")["pixel_values"]  
+    pixel_values = processor(images=image, return_tensors="pt")["pixel_values"]
     print("pixel_values shape:", tuple(pixel_values.shape))
 
     with torch.inference_mode():
         tokens = model(pixel_values=pixel_values).last_hidden_state  # last_hidden_state：末层输出，[1,50,768]。1 CLS + 49 patch
     print("last_hidden_state shape:", tuple(tokens.shape))
 
-    # 从配置读尺寸，不硬编码 
+    # 从配置读尺寸，不硬编码
     H, W = pixel_values.shape[-2:]    # 224, 224
     P = model.config.patch_size       # 32
-    grid_h = H // P         # 7 
+    grid_h = H // P         # 7
     grid_w = W // P        # 7
     num_patches = grid_h * grid_w   # 49
 
